@@ -13,10 +13,14 @@ Python Lambda with a Function URL that sends prompts to Amazon Bedrock via the b
 | --- | --- |
 | `AWS_ACCESS_KEY_ID` | Deploy credentials |
 | `AWS_SECRET_ACCESS_KEY` | Deploy credentials |
-| `AWS_REGION` | Region for deploy and Bedrock (e.g. `us-east-1`) |
 | `INFERENCE_API_KEY` | Shared secret clients must send as `x-api-key` |
 
-Optional repository variable: `MODEL_ID` (defaults to `amazon.nova-lite-v1:0`).
+Optional repository variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `AWS_REGION` | Region for deploy and Bedrock (defaults to `us-east-1`) |
+| `MODEL_ID` | Bedrock model ID (defaults to `amazon.nova-lite-v1:0`) |
 
 The Lambda talks to Bedrock with its **execution role**, not with the deploy access keys.
 
