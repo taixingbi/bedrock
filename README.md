@@ -196,8 +196,12 @@ sam deploy \
 ## Call the API
 
 ```bash
-export FUNCTION_URL='https://xxxx.lambda-url.us-east-1.on.amazonaws.com/'
-export INFERENCE_API_KEY='your-shared-secret'
+FUNCTION_URL=$(aws cloudformation describe-stacks \
+  --region us-east-1 \
+  --stack-name bedrock-inference-mvp \
+  --query "Stacks[0].Outputs[?OutputKey=='InferenceFunctionUrl'].OutputValue" \
+  --output text)
+INFERENCE_API_KEY='1234'
 
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
