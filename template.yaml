@@ -46,6 +46,7 @@ Resources:
           AllowHeaders:
             - content-type
             - x-api-key
+            - authorization
           AllowMethods:
             - POST
           MaxAge: 86400

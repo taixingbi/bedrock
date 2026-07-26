@@ -113,33 +113,56 @@ Qwen2.5 Custom Model Import does not support Converse; InvokeModel is required.
 
 ## API
 
-`POST` `/` or `/infer`
+### OpenAI-compatible (preferred)
+
+`POST` `/v1/chat/completions`
 
 ```json
 {
-  "prompt": "Hello",
-  "system": "optional system prompt",
-  "max_tokens": 512
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "messages": [
+    {"role": "system", "content": "optional system prompt"},
+    {"role": "user", "content": "Hello"}
+  ],
+  "max_tokens": 512,
+  "temperature": 0,
+  "top_p": 1.0
 }
 ```
 
-Headers:
+Headers (either works):
 
-- `Content-Type: application/json`
+- `Authorization: Bearer <INFERENCE_API_KEY>`
 - `x-api-key: <INFERENCE_API_KEY>`
 
-Success:
+Success (OpenAI chat.completion shape):
 
 ```json
 {
-  "text": "...",
-  "model": "amazon.nova-lite-v1:0",
+  "id": "chatcmpl-...",
+  "object": "chat.completion",
+  "created": 0,
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {"role": "assistant", "content": "..."},
+      "finish_reason": "stop"
+    }
+  ],
   "usage": {
-    "input_tokens": 0,
-    "output_tokens": 0
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
   }
 }
 ```
+
+The `model` field in the request is echoed in the response; Bedrock always uses the deployed `MODEL_ID`.
+
+### Legacy
+
+`POST` `/` or `/infer` still accepts `{"prompt","system","max_tokens"}` and returns `{"text","model","usage":{"input_tokens","output_tokens"}}`.
 
 Errors: `400` bad body, `401` missing/wrong key, `404` unknown path, `405` method, `502` Bedrock failure.
 
@@ -176,17 +199,25 @@ sam deploy \
 export FUNCTION_URL='https://xxxx.lambda-url.us-east-1.on.amazonaws.com/'
 export INFERENCE_API_KEY='your-shared-secret'
 
-curl -sS -X POST "${FUNCTION_URL}infer" \
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -H "x-api-key: $INFERENCE_API_KEY" \
-  -d '{"prompt":"Say hello in one short sentence.","max_tokens":64}'
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0,
+    "top_p": 1.0
+  }'
 ```
 
 ## Local invoke
 
-Set `API_KEY=local-dev-key` (matches `events/infer.json`), then:
+Set `API_KEY=local-dev-key` (matches event files), then:
 
 ```bash
 sam build
+sam local invoke InferenceFunction --event events/chat-completions.json
+# legacy:
 sam local invoke InferenceFunction --event events/infer.json
 ```

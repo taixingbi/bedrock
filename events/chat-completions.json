@@ -1,0 +1,17 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/v1/chat/completions",
+  "headers": {
+    "content-type": "application/json",
+    "authorization": "Bearer local-dev-key"
+  },
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/v1/chat/completions"
+    }
+  },
+  "isBase64Encoded": false,
+  "body": "{\"model\": \"Qwen/Qwen2.5-7B-Instruct\", \"messages\": [{\"role\": \"user\", \"content\": \"Say hello in one short sentence.\"}], \"max_tokens\": 64, \"temperature\": 0, \"top_p\": 1.0}"
+}
