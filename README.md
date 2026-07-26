@@ -94,7 +94,7 @@ aws bedrock get-model-import-job \
 aws bedrock list-imported-models --region us-east-1
 ```
 
-Set GitHub variable `MODEL_ID` to the imported model ARN and redeploy. If Converse fails for the imported model, the handler may need `InvokeModel` instead (not covered by this MVP).
+Set GitHub variable `MODEL_ID` to the imported model ARN and redeploy.
 
 Current imported model (`Qwen2.5-7B-Instruct`):
 
@@ -102,7 +102,14 @@ Current imported model (`Qwen2.5-7B-Instruct`):
 arn:aws:bedrock:us-east-1:646821141010:imported-model/npkn89zkoiyp
 ```
 
-This is set as the `MODEL_ID` repository variable, so deploys use Qwen2.5 by default. To switch back to Nova, set `MODEL_ID=amazon.nova-lite-v1:0` and redeploy.
+This is set as the `MODEL_ID` repository variable.
+
+The handler picks the Bedrock API automatically:
+
+- Marketplace models (e.g. `amazon.nova-lite-v1:0`) → **Converse**
+- Imported models (`:imported-model/` ARN, e.g. Qwen2.5) → **InvokeModel** with an OpenAI-compatible `messages` body
+
+Qwen2.5 Custom Model Import does not support Converse; InvokeModel is required.
 
 ## API
 
