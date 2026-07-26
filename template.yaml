@@ -48,7 +48,6 @@ Resources:
             - x-api-key
           AllowMethods:
             - POST
-            - OPTIONS
           MaxAge: 86400
 
 Outputs:

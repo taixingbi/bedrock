@@ -1,1 +1,1 @@
-boto3>=1.35.0
+# boto3 is provided by the Lambda Python runtime; pin locally only if needed for sam local.
