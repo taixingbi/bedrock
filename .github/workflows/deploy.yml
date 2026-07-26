@@ -39,8 +39,33 @@ jobs:
       - name: Build
         run: sam build
 
-      - name: Deploy
+      - name: Check required secrets
+        env:
+          API_KEY: ${{ secrets.INFERENCE_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
+          missing=0
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "::error::Missing repository secret AWS_ACCESS_KEY_ID"
+            missing=1
+          fi
+          if [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::Missing repository secret AWS_SECRET_ACCESS_KEY"
+            missing=1
+          fi
+          if [ -z "$API_KEY" ]; then
+            echo "::error::Missing repository secret INFERENCE_API_KEY. Add it under Settings → Secrets and variables → Actions → Repository secrets (name must match exactly)."
+            missing=1
+          fi
+          exit "$missing"
+
+      - name: Deploy
+        env:
+          MODEL_ID: ${{ vars.MODEL_ID }}
+          API_KEY: ${{ secrets.INFERENCE_API_KEY }}
+        run: |
+          MODEL_ID="${MODEL_ID:-amazon.nova-lite-v1:0}"
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
@@ -48,8 +73,5 @@ jobs:
             --resolve-s3 \
             --capabilities CAPABILITY_IAM \
             --parameter-overrides \
-              "ModelId=${MODEL_ID:-amazon.nova-lite-v1:0}" \
+              "ModelId=${MODEL_ID}" \
               "ApiKey=${API_KEY}"
-        env:
-          MODEL_ID: ${{ vars.MODEL_ID }}
-          API_KEY: ${{ secrets.INFERENCE_API_KEY }}
