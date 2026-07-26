@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-hf/
 venv/
 .env
 *.zip
+tmp.md
+Qwen2.5-*/
