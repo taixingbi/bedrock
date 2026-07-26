@@ -1,0 +1,17 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/infer",
+  "headers": {
+    "content-type": "application/json",
+    "x-api-key": "local-dev-key"
+  },
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/infer"
+    }
+  },
+  "isBase64Encoded": false,
+  "body": "{\"prompt\": \"Say hello in one short sentence.\", \"max_tokens\": 64}"
+}

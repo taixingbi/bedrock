@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: MVP Bedrock inference API via Lambda Function URL
+
+Parameters:
+  ModelId:
+    Type: String
+    Default: amazon.nova-lite-v1:0
+    Description: Bedrock model ID for Converse
+  ApiKey:
+    Type: String
+    NoEcho: true
+    Description: Shared secret required in x-api-key header
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 256
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+
+Resources:
+  InferenceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: bedrock-inference-mvp
+      CodeUri: src/
+      Handler: handler.handler
+      Environment:
+        Variables:
+          MODEL_ID: !Ref ModelId
+          API_KEY: !Ref ApiKey
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource: "*"
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - "*"
+          AllowHeaders:
+            - content-type
+            - x-api-key
+          AllowMethods:
+            - POST
+            - OPTIONS
+          MaxAge: 86400
+
+Outputs:
+  InferenceFunctionUrl:
+    Description: Lambda Function URL for the inference API
+    Value: !GetAtt InferenceFunctionUrl.FunctionUrl
+  InferenceFunctionArn:
+    Description: Inference Lambda ARN
+    Value: !GetAtt InferenceFunction.Arn
