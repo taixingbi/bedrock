@@ -1,1 +1,2 @@
-# boto3 is provided by the Lambda Python runtime; pin locally only if needed for sam local.
+fastapi>=0.115.0
+uvicorn>=0.32.0

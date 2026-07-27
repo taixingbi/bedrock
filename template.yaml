@@ -6,16 +6,16 @@ Parameters:
   ModelId:
     Type: String
     Default: amazon.nova-lite-v1:0
-    Description: Bedrock model ID for Converse
+    Description: Bedrock model ID for Converse / InvokeModel
   ApiKey:
     Type: String
     NoEcho: true
-    Description: Shared secret required in x-api-key header
+    Description: Shared secret required in Authorization Bearer or x-api-key header
 
 Globals:
   Function:
     Timeout: 60
-    MemorySize: 256
+    MemorySize: 512
     Runtime: python3.12
     Architectures:
       - x86_64
@@ -26,20 +26,28 @@ Resources:
     Properties:
       FunctionName: bedrock-inference-mvp
       CodeUri: src/
-      Handler: handler.handler
+      Handler: run.sh
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:28
       Environment:
         Variables:
           MODEL_ID: !Ref ModelId
           API_KEY: !Ref ApiKey
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: response_stream
+          AWS_LWA_PORT: "8080"
       Policies:
         - Statement:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
+                - bedrock:Converse
+                - bedrock:ConverseStream
               Resource: "*"
       FunctionUrlConfig:
         AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
         Cors:
           AllowOrigins:
             - "*"
@@ -50,6 +58,8 @@ Resources:
           AllowMethods:
             - POST
           MaxAge: 86400
+    Metadata:
+      BuildMethod: makefile
 
 Outputs:
   InferenceFunctionUrl:

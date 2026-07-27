@@ -160,6 +160,8 @@ Success (OpenAI chat.completion shape):
 
 The `model` field in the request is echoed in the response; Bedrock always uses the deployed `MODEL_ID`.
 
+Set `"stream": true` to receive OpenAI SSE (`text/event-stream`) chunks (`chat.completion.chunk` then `data: [DONE]`). Streaming uses Lambda Function URL `RESPONSE_STREAM` plus Bedrock `InvokeModelWithResponseStream` / `ConverseStream`.
+
 ### Legacy
 
 `POST` `/` or `/infer` still accepts `{"prompt","system","max_tokens"}` and returns `{"text","model","usage":{"input_tokens","output_tokens"}}`.
@@ -203,7 +205,7 @@ FUNCTION_URL=$(aws cloudformation describe-stacks \
   --output text)
 INFERENCE_API_KEY='1234'
 
-curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+curl -sS -N -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
   -d '{
@@ -211,17 +213,33 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0,
-    "top_p": 1.0
+    "top_p": 1.0,
+    "stream": true
   }'
 ```
 
 ## Local invoke
 
-Set `API_KEY=local-dev-key` (matches event files), then:
+Run the FastAPI app locally (uses your AWS credentials for Bedrock):
 
 ```bash
-sam build
-sam local invoke InferenceFunction --event events/chat-completions.json
-# legacy:
-sam local invoke InferenceFunction --event events/infer.json
+export API_KEY=local-dev-key
+export MODEL_ID='arn:aws:bedrock:us-east-1:646821141010:imported-model/npkn89zkoiyp'
+pip install -r src/requirements.txt
+uvicorn app:app --app-dir src --host 127.0.0.1 --port 8080
+```
+
+Then:
+
+```bash
+curl -sS -N -X POST "http://127.0.0.1:8080/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer local-dev-key" \
+  -d '{
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0,
+    "stream": true
+  }'
 ```
