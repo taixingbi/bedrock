@@ -63,15 +63,22 @@ jobs:
       - name: Deploy
         env:
           MODEL_ID: ${{ vars.MODEL_ID }}
+          MODEL_MAP: ${{ vars.MODEL_MAP }}
           API_KEY: ${{ secrets.INFERENCE_API_KEY }}
         run: |
           MODEL_ID="${MODEL_ID:-amazon.nova-lite-v1:0}"
+          # Empty ModelMap is fine; Claude Sonnet aliases are built into the app.
+          PARAMS=(
+            "ModelId=${MODEL_ID}"
+            "ApiKey=${API_KEY}"
+          )
+          if [ -n "${MODEL_MAP}" ]; then
+            PARAMS+=("ModelMap=${MODEL_MAP}")
+          fi
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --stack-name bedrock-inference-mvp \
             --resolve-s3 \
             --capabilities CAPABILITY_IAM \
-            --parameter-overrides \
-              "ModelId=${MODEL_ID}" \
-              "ApiKey=${API_KEY}"
+            --parameter-overrides "${PARAMS[@]}"

@@ -6,7 +6,11 @@ Parameters:
   ModelId:
     Type: String
     Default: amazon.nova-lite-v1:0
-    Description: Bedrock model ID for Converse / InvokeModel
+    Description: Default Bedrock model ID / imported-model ARN when request omits model
+  ModelMap:
+    Type: String
+    Default: ""
+    Description: Optional JSON object of request model alias → Bedrock model ID/ARN
   ApiKey:
     Type: String
     NoEcho: true
@@ -32,6 +36,7 @@ Resources:
       Environment:
         Variables:
           MODEL_ID: !Ref ModelId
+          MODEL_MAP: !Ref ModelMap
           API_KEY: !Ref ApiKey
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
           AWS_LWA_INVOKE_MODE: response_stream

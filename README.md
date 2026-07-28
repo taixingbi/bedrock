@@ -20,26 +20,88 @@ Optional repository variables:
 | Variable | Purpose |
 | --- | --- |
 | `AWS_REGION` | Region for deploy and Bedrock (defaults to `us-east-1`) |
-| `MODEL_ID` | Bedrock model ID or **imported model ARN** (defaults to `amazon.nova-lite-v1:0`) |
+| `MODEL_ID` | Default Bedrock model ID or **imported model ARN** when the request omits `model` (defaults to `amazon.nova-lite-v1:0`) |
+| `MODEL_MAP` | Optional JSON object of request alias → Bedrock ID/ARN (merges with built-in aliases) |
 
 The Lambda talks to Bedrock with its **execution role**, not with the deploy access keys. Bedrock is managed inference — you do not choose a GPU.
 
 ## Models
 
+The request `model` field selects which Bedrock backend to call. Built-in aliases:
+
+| Request `model` | Bedrock ID | API |
+| --- | --- | --- |
+| `claude-sonnet` / `claude-sonnet-5` / `anthropic.claude-sonnet-5` | `anthropic.claude-sonnet-5` | Converse |
+| `us.anthropic.claude-sonnet-5` | US geo inference profile | Converse |
+| `nova-pro` / `amazon.nova-pro-v1:0` | `amazon.nova-pro-v1:0` | Converse |
+| `us.amazon.nova-pro-v1:0` | US geo inference profile | Converse |
+| `nova-lite` / `amazon.nova-lite-v1:0` | `amazon.nova-lite-v1:0` | Converse |
+| `Qwen/Qwen2.5-7B-Instruct` / `qwen` | deployed `MODEL_ID` when it is an imported-model ARN | InvokeModel |
+
+Raw Bedrock IDs and imported-model ARNs are also accepted. Unknown names return `400`.
+
+Override or add aliases with the `MODEL_MAP` env / repo variable, e.g.:
+
+```json
+{"my-qwen":"arn:aws:bedrock:us-east-1:646821141010:imported-model/npkn89zkoiyp"}
+```
+
 ### Default (marketplace)
 
 `amazon.nova-lite-v1:0` — enable access in the Bedrock console for `us-east-1`, then deploy (or set repo variable `MODEL_ID`).
 
+### Amazon Nova Pro (marketplace)
+
+Enable model access in the Bedrock console, then call:
+
+```json
+{"model": "nova-pro", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+Optional catalog manifest:
+
+```bash
+./scripts/upload-model-to-s3.sh nova-pro
+# → s3://bedrock-models-646821141010/amazon/nova-pro-v1/model-manifest.json
+```
+
+| Mode | Bedrock ID |
+| --- | --- |
+| In-region (`us-east-1`) | `amazon.nova-pro-v1:0` |
+| US geo cross-region | `us.amazon.nova-pro-v1:0` |
+
+### Claude Sonnet (marketplace)
+
+Anthropic does not publish Claude weights — no `hf download` / Custom Model Import. Enable model access in the Bedrock console, then call:
+
+```json
+{"model": "claude-sonnet-5", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+Optional catalog manifest in the shared bucket:
+
+```bash
+./scripts/upload-model-to-s3.sh claude-sonnet
+# → s3://bedrock-models-646821141010/anthropic/claude-sonnet-5/model-manifest.json
+```
+
+| Mode | Bedrock ID |
+| --- | --- |
+| In-region (`us-east-1`) | `anthropic.claude-sonnet-5` |
+| US geo cross-region | `us.anthropic.claude-sonnet-5` |
+| Global | `global.anthropic.claude-sonnet-5` |
+
 ### Custom import (e.g. Qwen2.5)
 
-Qwen2.5 is not a built-in Bedrock marketplace ID. Download Hugging Face weights, upload to S3, then [Custom Model Import](https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html). Set `MODEL_ID` to the **imported model ARN**.
+Qwen2.5 is not a built-in Bedrock marketplace ID. Download Hugging Face weights, upload to S3, then [Custom Model Import](https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html). Set `MODEL_ID` to the **imported model ARN** (also used for the `Qwen/Qwen2.5-7B-Instruct` alias).
 
 Shared models bucket (`us-east-1`):
 
 ```text
 s3://bedrock-models-646821141010/
   qwen/Qwen2.5-7B-Instruct/   ← config.json must live here
-  anthropic/                  ← future open/custom weights
+  anthropic/claude-sonnet-5/  ← marketplace manifest (no HF weights)
+  amazon/nova-pro-v1/         ← marketplace manifest (no HF weights)
   meta/                       ← future
 ```
 
@@ -48,19 +110,11 @@ Marketplace Claude/Nova models are enabled in the Bedrock console — they are n
 #### 1. Download and upload Qwen2.5-7B-Instruct
 
 ```bash
-python3 -m venv .venv-hf
-source .venv-hf/bin/activate
-python -m pip install --upgrade pip huggingface_hub
+# needs: pip install huggingface_hub  (provides `hf`)
+./scripts/upload-model-to-s3.sh qwen
 
-hf download Qwen/Qwen2.5-7B-Instruct --local-dir ./Qwen2.5-7B-Instruct
-ls ./Qwen2.5-7B-Instruct/config.json
-
-aws s3 sync ./Qwen2.5-7B-Instruct \
-  s3://bedrock-models-646821141010/qwen/Qwen2.5-7B-Instruct/ \
-  --region us-east-1 \
-  --exclude ".cache/*"
-
-deactivate
+# or sync an existing checkout:
+./scripts/upload-model-to-s3.sh qwen --local ./Qwen2.5-7B-Instruct
 ```
 
 (~15 GB download; keep model dirs and `.venv-hf` out of git.)
@@ -102,11 +156,11 @@ Current imported model (`Qwen2.5-7B-Instruct`):
 arn:aws:bedrock:us-east-1:646821141010:imported-model/npkn89zkoiyp
 ```
 
-This is set as the `MODEL_ID` repository variable.
+This is set as the `MODEL_ID` repository variable (default + `Qwen/...` alias). Claude Sonnet works in the same deploy via built-in aliases — no need to swap `MODEL_ID`.
 
-The handler picks the Bedrock API automatically:
+The handler picks the Bedrock API per resolved model:
 
-- Marketplace models (e.g. `amazon.nova-lite-v1:0`) → **Converse**
+- Marketplace models (Claude Sonnet, Nova, …) → **Converse**
 - Imported models (`:imported-model/` ARN, e.g. Qwen2.5) → **InvokeModel** with an OpenAI-compatible `messages` body
 
 Qwen2.5 Custom Model Import does not support Converse; InvokeModel is required.
@@ -158,15 +212,9 @@ Success (OpenAI chat.completion shape):
 }
 ```
 
-The `model` field in the request is echoed in the response; Bedrock always uses the deployed `MODEL_ID`.
+The `model` field selects the Bedrock backend (see [Models](#models)); the same name is echoed in the response.
 
 Set `"stream": true` to receive OpenAI SSE (`text/event-stream`) chunks (`chat.completion.chunk` then `data: [DONE]`). Streaming uses Lambda Function URL `RESPONSE_STREAM` plus Bedrock `InvokeModelWithResponseStream` / `ConverseStream`.
-
-### Legacy
-
-`POST` `/` or `/infer` still accepts `{"prompt","system","max_tokens"}` and returns `{"text","model","usage":{"input_tokens","output_tokens"}}`.
-
-Errors: `400` bad body, `401` missing/wrong key, `404` unknown path, `405` method, `502` Bedrock failure.
 
 ## Deploy
 
@@ -191,11 +239,13 @@ sam build
 sam deploy \
   --region us-east-1 \
   --parameter-overrides \
-    ModelId=amazon.nova-lite-v1:0 \
+    ModelId=arn:aws:bedrock:us-east-1:646821141010:imported-model/npkn89zkoiyp \
     ApiKey='your-shared-secret'
 ```
 
 ## Call the API
+
+Qwen (imported):
 
 ```bash
 FUNCTION_URL=$(aws cloudformation describe-stacks \
@@ -216,6 +266,34 @@ curl -sS -N -X POST "${FUNCTION_URL}v1/chat/completions" \
     "top_p": 1.0,
     "stream": true
   }'
+```
+
+Claude Sonnet (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-sonnet-5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+Amazon Nova Pro (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "nova-pro",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
 ```
 
 ## Local invoke

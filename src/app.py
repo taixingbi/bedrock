@@ -12,14 +12,83 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 bedrock = boto3.client("bedrock-runtime")
 
-MODEL_ID = os.environ.get("MODEL_ID", "amazon.nova-lite-v1:0")
+DEFAULT_MODEL_ID = os.environ.get("MODEL_ID", "amazon.nova-lite-v1:0")
+# Back-compat alias used in a few call sites / docs.
+MODEL_ID = DEFAULT_MODEL_ID
 API_KEY = os.environ.get("API_KEY", "")
 
-app = FastAPI(title="mvp-bedrock")
+# Friendly request names → Bedrock model ID / imported-model ARN.
+_BUILTIN_MODEL_ALIASES: dict[str, str] = {
+    "claude-sonnet": "anthropic.claude-sonnet-5",
+    "claude-sonnet-5": "anthropic.claude-sonnet-5",
+    "anthropic.claude-sonnet-5": "anthropic.claude-sonnet-5",
+    "us.anthropic.claude-sonnet-5": "us.anthropic.claude-sonnet-5",
+    "global.anthropic.claude-sonnet-5": "global.anthropic.claude-sonnet-5",
+    "amazon.nova-lite-v1:0": "amazon.nova-lite-v1:0",
+    "nova-lite": "amazon.nova-lite-v1:0",
+    "amazon.nova-pro-v1:0": "amazon.nova-pro-v1:0",
+    "nova-pro": "amazon.nova-pro-v1:0",
+    "us.amazon.nova-pro-v1:0": "us.amazon.nova-pro-v1:0",
+}
 
 
 def _is_imported_model(model_id: str) -> bool:
     return ":imported-model/" in model_id
+
+
+def _load_model_map() -> dict[str, str]:
+    mapping = dict(_BUILTIN_MODEL_ALIASES)
+    mapping[DEFAULT_MODEL_ID] = DEFAULT_MODEL_ID
+    if _is_imported_model(DEFAULT_MODEL_ID):
+        mapping.setdefault("Qwen/Qwen2.5-7B-Instruct", DEFAULT_MODEL_ID)
+        mapping.setdefault("qwen2.5-7b-instruct", DEFAULT_MODEL_ID)
+        mapping.setdefault("qwen", DEFAULT_MODEL_ID)
+
+    raw = os.environ.get("MODEL_MAP", "").strip()
+    if raw:
+        try:
+            extra = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"MODEL_MAP must be valid JSON: {exc}") from exc
+        if not isinstance(extra, dict):
+            raise RuntimeError("MODEL_MAP must be a JSON object of alias → bedrock id")
+        for key, value in extra.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                raise RuntimeError("MODEL_MAP keys and values must be strings")
+            mapping[key] = value
+    return mapping
+
+
+MODEL_MAP = _load_model_map()
+
+app = FastAPI(title="mvp-bedrock")
+
+
+def _resolve_model(request_model: Any) -> tuple[str, str]:
+    """Return (response_model_name, bedrock_model_id)."""
+    if request_model is None or request_model == "":
+        return DEFAULT_MODEL_ID, DEFAULT_MODEL_ID
+    if not isinstance(request_model, str):
+        raise ValueError("model must be a string")
+
+    name = request_model.strip()
+    if name in MODEL_MAP:
+        return name, MODEL_MAP[name]
+
+    # Allow raw Bedrock IDs / ARNs / inference profiles not listed in the map.
+    if (
+        name.startswith("arn:aws:bedrock:")
+        or name.startswith("anthropic.")
+        or name.startswith("amazon.")
+        or name.startswith("us.")
+        or name.startswith("eu.")
+        or name.startswith("au.")
+        or name.startswith("global.")
+    ):
+        return name, name
+
+    known = ", ".join(sorted(MODEL_MAP))
+    raise ValueError(f"unknown model '{name}'; known: {known}")
 
 
 def _authorized(x_api_key: str | None, authorization: str | None) -> bool:
@@ -159,6 +228,7 @@ def _infer_converse(
     max_tokens: int,
     temperature: float | None,
     top_p: float | None,
+    bedrock_model_id: str,
 ) -> dict[str, Any]:
     system, rest = _split_system(messages)
     converse_messages = [
@@ -171,7 +241,7 @@ def _infer_converse(
         inference_config["topP"] = top_p
 
     converse_args: dict[str, Any] = {
-        "modelId": MODEL_ID,
+        "modelId": bedrock_model_id,
         "messages": converse_messages,
         "inferenceConfig": inference_config,
     }
@@ -194,9 +264,10 @@ def _infer_invoke_model(
     max_tokens: int,
     temperature: float | None,
     top_p: float | None,
+    bedrock_model_id: str,
 ) -> dict[str, Any]:
     raw = bedrock.invoke_model(
-        modelId=MODEL_ID,
+        modelId=bedrock_model_id,
         contentType="application/json",
         accept="application/json",
         body=json.dumps(
@@ -327,10 +398,11 @@ def _stream_invoke_model(
     temperature: float | None,
     top_p: float | None,
     model: str,
+    bedrock_model_id: str,
 ) -> Iterator[str]:
     # Open Bedrock stream before emitting SSE so setup failures become HTTP 502.
     response = bedrock.invoke_model_with_response_stream(
-        modelId=MODEL_ID,
+        modelId=bedrock_model_id,
         contentType="application/json",
         accept="application/json",
         body=json.dumps(
@@ -406,6 +478,7 @@ def _stream_converse(
     temperature: float | None,
     top_p: float | None,
     model: str,
+    bedrock_model_id: str,
 ) -> Iterator[str]:
     system, rest = _split_system(messages)
     converse_messages = [
@@ -418,7 +491,7 @@ def _stream_converse(
         inference_config["topP"] = top_p
 
     converse_args: dict[str, Any] = {
-        "modelId": MODEL_ID,
+        "modelId": bedrock_model_id,
         "messages": converse_messages,
         "inferenceConfig": inference_config,
     }
@@ -480,10 +553,15 @@ def _run_inference(
     max_tokens: int,
     temperature: float | None,
     top_p: float | None,
+    bedrock_model_id: str,
 ) -> dict[str, Any]:
-    if _is_imported_model(MODEL_ID):
-        return _infer_invoke_model(messages, max_tokens, temperature, top_p)
-    return _infer_converse(messages, max_tokens, temperature, top_p)
+    if _is_imported_model(bedrock_model_id):
+        return _infer_invoke_model(
+            messages, max_tokens, temperature, top_p, bedrock_model_id
+        )
+    return _infer_converse(
+        messages, max_tokens, temperature, top_p, bedrock_model_id
+    )
 
 
 def _stream_inference(
@@ -492,10 +570,15 @@ def _stream_inference(
     temperature: float | None,
     top_p: float | None,
     model: str,
+    bedrock_model_id: str,
 ) -> Iterator[str]:
-    if _is_imported_model(MODEL_ID):
-        return _stream_invoke_model(messages, max_tokens, temperature, top_p, model)
-    return _stream_converse(messages, max_tokens, temperature, top_p, model)
+    if _is_imported_model(bedrock_model_id):
+        return _stream_invoke_model(
+            messages, max_tokens, temperature, top_p, model, bedrock_model_id
+        )
+    return _stream_converse(
+        messages, max_tokens, temperature, top_p, model, bedrock_model_id
+    )
 
 
 def _bedrock_error(exc: Exception) -> JSONResponse:
@@ -538,20 +621,22 @@ async def chat_completions(
     try:
         messages = _normalize_messages(payload)
         max_tokens, temperature, top_p = _parse_sampling(payload)
+        response_model, bedrock_model_id = _resolve_model(payload.get("model"))
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
-    request_model = payload.get("model")
-    response_model = (
-        request_model if isinstance(request_model, str) and request_model else MODEL_ID
-    )
     stream = bool(payload.get("stream"))
 
     if stream:
         try:
             # Force Bedrock stream open before returning so setup errors are JSON 502.
             generator = _stream_inference(
-                messages, max_tokens, temperature, top_p, response_model
+                messages,
+                max_tokens,
+                temperature,
+                top_p,
+                response_model,
+                bedrock_model_id,
             )
             first = next(generator)
         except Exception as exc:  # noqa: BLE001
@@ -571,7 +656,9 @@ async def chat_completions(
         )
 
     try:
-        inferred = _run_inference(messages, max_tokens, temperature, top_p)
+        inferred = _run_inference(
+            messages, max_tokens, temperature, top_p, bedrock_model_id
+        )
     except Exception as exc:  # noqa: BLE001
         return _bedrock_error(exc)
 
@@ -596,16 +683,14 @@ async def _legacy_infer(
     try:
         messages = _normalize_messages(payload)
         max_tokens, temperature, top_p = _parse_sampling(payload)
+        response_model, bedrock_model_id = _resolve_model(payload.get("model"))
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
-    request_model = payload.get("model")
-    response_model = (
-        request_model if isinstance(request_model, str) and request_model else MODEL_ID
-    )
-
     try:
-        inferred = _run_inference(messages, max_tokens, temperature, top_p)
+        inferred = _run_inference(
+            messages, max_tokens, temperature, top_p, bedrock_model_id
+        )
     except Exception as exc:  # noqa: BLE001
         return _bedrock_error(exc)
 
