@@ -4,6 +4,7 @@ FUNCTION_URL=$(aws cloudformation describe-stacks \
   --query "Stacks[0].Outputs[?OutputKey=='InferenceFunctionUrl'].OutputValue" \
   --output text)
 INFERENCE_API_KEY=1234
+
 # Qwen (imported)
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
@@ -14,7 +15,7 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "max_tokens": 64,
     "temperature": 0,
     "top_p": 1.0
-  }' | jq '{model, answer: .choices[0].message.content, usage}'
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
 
 # Amazon Nova Pro (marketplace)
@@ -26,10 +27,34 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0
-  }' | jq '{model, answer: .choices[0].message.content, usage}'
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
 
-# Claude Sonnet (marketplace) not work now
+# Meta Llama 3.3 (marketplace)
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "llama",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+echo
+
+# OpenAI GPT-OSS (marketplace)
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "gpt-oss",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+echo
+
+# Claude Sonnet (marketplace) — needs Anthropic use-case form
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
@@ -38,7 +63,5 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0
-  }' | jq '{model, answer: .choices[0].message.content, usage}'
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
-
-

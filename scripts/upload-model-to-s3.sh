@@ -4,6 +4,8 @@
 # Usage:
 #   ./scripts/upload-model-to-s3.sh claude-sonnet
 #   ./scripts/upload-model-to-s3.sh nova-pro
+#   ./scripts/upload-model-to-s3.sh llama
+#   ./scripts/upload-model-to-s3.sh gpt-oss
 #   ./scripts/upload-model-to-s3.sh qwen
 #   ./scripts/upload-model-to-s3.sh qwen --local ./Qwen2.5-7B-Instruct
 #
@@ -23,6 +25,8 @@ Usage: ./scripts/upload-model-to-s3.sh <model> [options]
 Models:
   claude-sonnet   Register marketplace manifest (no HF weights)
   nova-pro        Register marketplace manifest (no HF weights)
+  llama           Register Meta Llama 3.3 70B marketplace manifest
+  gpt-oss         Register OpenAI GPT-OSS 120B marketplace manifest
   qwen            Download Qwen2.5-7B-Instruct (unless --local) and s3 sync
 
 Options (qwen):
@@ -50,7 +54,7 @@ upload_marketplace_manifest() {
   local model_name="$3"
   local model_id="$4"
   local aliases="$5"
-  local us_profile="${6:-us.${model_id}}"
+  local us_profile="${6:-}"
   local global_profile="${7-}"
   local prefix="${provider}/${model_name}"
 
@@ -59,7 +63,7 @@ upload_marketplace_manifest() {
   trap 'rm -rf "$tmp"' RETURN
 
   local profiles
-  if [[ -n "${global_profile}" ]]; then
+  if [[ -n "${us_profile}" && -n "${global_profile}" ]]; then
     profiles=$(cat <<EOF
   "inference_profile_ids": {
     "in_region": "${model_id}",
@@ -68,11 +72,18 @@ upload_marketplace_manifest() {
   },
 EOF
 )
-  else
+  elif [[ -n "${us_profile}" ]]; then
     profiles=$(cat <<EOF
   "inference_profile_ids": {
     "in_region": "${model_id}",
     "us": "${us_profile}"
+  },
+EOF
+)
+  else
+    profiles=$(cat <<EOF
+  "inference_profile_ids": {
+    "in_region": "${model_id}"
   },
 EOF
 )
@@ -122,7 +133,6 @@ upload_claude_sonnet() {
 upload_nova_pro() {
   local model_name="${MODEL_NAME:-nova-pro-v1}"
   local model_id="${MODEL_ID:-amazon.nova-pro-v1:0}"
-  # Nova Pro has US/EU geo profiles; no global profile.
   upload_marketplace_manifest \
     "Amazon Nova Pro" \
     "amazon" \
@@ -130,6 +140,32 @@ upload_nova_pro() {
     "${model_id}" \
     "nova-pro, amazon.nova-pro-v1:0" \
     "${US_PROFILE:-us.${model_id}}" \
+    ""
+}
+
+upload_llama() {
+  local model_name="${MODEL_NAME:-llama3-3-70b-instruct}"
+  local model_id="${MODEL_ID:-meta.llama3-3-70b-instruct-v1:0}"
+  upload_marketplace_manifest \
+    "Meta Llama 3.3 70B Instruct" \
+    "meta" \
+    "${model_name}" \
+    "${model_id}" \
+    "llama, llama3.3, llama-3.3-70b, us.meta.llama3-3-70b-instruct-v1:0" \
+    "${US_PROFILE:-us.${model_id}}" \
+    ""
+}
+
+upload_gpt_oss() {
+  local model_name="${MODEL_NAME:-gpt-oss-120b}"
+  local model_id="${MODEL_ID:-openai.gpt-oss-120b-1:0}"
+  upload_marketplace_manifest \
+    "OpenAI GPT-OSS 120B" \
+    "openai" \
+    "${model_name}" \
+    "${model_id}" \
+    "gpt-oss, gpt-oss-120b, openai.gpt-oss-120b-1:0" \
+    "" \
     ""
 }
 
@@ -187,10 +223,16 @@ case "${MODEL}" in
   nova-pro|nova-pro-v1|amazon.nova-pro-v1:0)
     upload_nova_pro
     ;;
+  llama|llama3.3|llama-3.3-70b|meta.llama3-3-70b-instruct-v1:0)
+    upload_llama
+    ;;
+  gpt-oss|gpt-oss-120b|openai.gpt-oss-120b-1:0)
+    upload_gpt_oss
+    ;;
   qwen|Qwen2.5-7B-Instruct|qwen2.5-7b-instruct)
     upload_qwen "$@"
     ;;
   *)
-    die "unknown model '${MODEL}' (try: claude-sonnet, nova-pro, qwen)"
+    die "unknown model '${MODEL}' (try: claude-sonnet, nova-pro, llama, gpt-oss, qwen)"
     ;;
 esac

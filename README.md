@@ -36,6 +36,11 @@ The request `model` field selects which Bedrock backend to call. Built-in aliase
 | `nova-pro` / `amazon.nova-pro-v1:0` | `amazon.nova-pro-v1:0` | Converse |
 | `us.amazon.nova-pro-v1:0` | US geo inference profile | Converse |
 | `nova-lite` / `amazon.nova-lite-v1:0` | `amazon.nova-lite-v1:0` | Converse |
+| `llama` / `llama3.3` / `llama-3.3-70b` | `us.meta.llama3-3-70b-instruct-v1:0` | Converse |
+| `llama4` / `llama4-maverick` | `us.meta.llama4-maverick-17b-instruct-v1:0` | Converse |
+| `llama4-scout` | `us.meta.llama4-scout-17b-instruct-v1:0` | Converse |
+| `gpt-oss` / `gpt-oss-120b` | `openai.gpt-oss-120b-1:0` | Converse |
+| `gpt-oss-20b` | `openai.gpt-oss-20b-1:0` | Converse |
 | `Qwen/Qwen2.5-7B-Instruct` / `qwen` | deployed `MODEL_ID` when it is an imported-model ARN | InvokeModel |
 
 Raw Bedrock IDs and imported-model ARNs are also accepted. Unknown names return `400`.
@@ -91,6 +96,45 @@ Optional catalog manifest in the shared bucket:
 | US geo cross-region | `us.anthropic.claude-sonnet-5` |
 | Global | `global.anthropic.claude-sonnet-5` |
 
+Submit the Anthropic use-case form in the Bedrock console before first invoke.
+
+### Meta Llama (marketplace)
+
+Enable Meta model access in the Bedrock console. Friendly aliases default to the **US geo inference profile** (required for on-demand on many Llama IDs):
+
+```json
+{"model": "llama", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+| Alias | Bedrock ID |
+| --- | --- |
+| `llama` / `llama3.3` | `us.meta.llama3-3-70b-instruct-v1:0` |
+| `llama4` / `llama4-maverick` | `us.meta.llama4-maverick-17b-instruct-v1:0` |
+| `llama4-scout` | `us.meta.llama4-scout-17b-instruct-v1:0` |
+
+```bash
+./scripts/upload-model-to-s3.sh llama
+# → s3://bedrock-models-646821141010/meta/llama3-3-70b-instruct/model-manifest.json
+```
+
+### OpenAI GPT-OSS (marketplace)
+
+Bedrock-hosted OpenAI open-weight models (not ChatGPT API keys). Enable access, then:
+
+```json
+{"model": "gpt-oss", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+| Alias | Bedrock ID |
+| --- | --- |
+| `gpt-oss` / `gpt-oss-120b` | `openai.gpt-oss-120b-1:0` |
+| `gpt-oss-20b` | `openai.gpt-oss-20b-1:0` |
+
+```bash
+./scripts/upload-model-to-s3.sh gpt-oss
+# → s3://bedrock-models-646821141010/openai/gpt-oss-120b/model-manifest.json
+```
+
 ### Custom import (e.g. Qwen2.5)
 
 Qwen2.5 is not a built-in Bedrock marketplace ID. Download Hugging Face weights, upload to S3, then [Custom Model Import](https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html). Set `MODEL_ID` to the **imported model ARN** (also used for the `Qwen/Qwen2.5-7B-Instruct` alias).
@@ -102,10 +146,11 @@ s3://bedrock-models-646821141010/
   qwen/Qwen2.5-7B-Instruct/   ← config.json must live here
   anthropic/claude-sonnet-5/  ← marketplace manifest (no HF weights)
   amazon/nova-pro-v1/         ← marketplace manifest (no HF weights)
-  meta/                       ← future
+  meta/llama3-3-70b-instruct/ ← marketplace manifest (no HF weights)
+  openai/gpt-oss-120b/        ← marketplace manifest (no HF weights)
 ```
 
-Marketplace Claude/Nova models are enabled in the Bedrock console — they are not stored as HF weights in this bucket.
+Marketplace Claude/Nova/Meta/OpenAI models are enabled in the Bedrock console — they are not stored as HF weights in this bucket.
 
 #### 1. Download and upload Qwen2.5-7B-Instruct
 
@@ -290,6 +335,34 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
   -d '{
     "model": "nova-pro",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+Meta Llama 3.3 (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "llama",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+OpenAI GPT-OSS (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "gpt-oss",
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0

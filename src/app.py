@@ -29,6 +29,27 @@ _BUILTIN_MODEL_ALIASES: dict[str, str] = {
     "amazon.nova-pro-v1:0": "amazon.nova-pro-v1:0",
     "nova-pro": "amazon.nova-pro-v1:0",
     "us.amazon.nova-pro-v1:0": "us.amazon.nova-pro-v1:0",
+    # Meta Llama — default to US geo inference profiles (on-demand).
+    "llama": "us.meta.llama3-3-70b-instruct-v1:0",
+    "llama3.3": "us.meta.llama3-3-70b-instruct-v1:0",
+    "llama-3.3-70b": "us.meta.llama3-3-70b-instruct-v1:0",
+    "meta.llama3-3-70b-instruct-v1:0": "meta.llama3-3-70b-instruct-v1:0",
+    "us.meta.llama3-3-70b-instruct-v1:0": "us.meta.llama3-3-70b-instruct-v1:0",
+    "llama4": "us.meta.llama4-maverick-17b-instruct-v1:0",
+    "llama4-maverick": "us.meta.llama4-maverick-17b-instruct-v1:0",
+    "llama-4-maverick": "us.meta.llama4-maverick-17b-instruct-v1:0",
+    "meta.llama4-maverick-17b-instruct-v1:0": "meta.llama4-maverick-17b-instruct-v1:0",
+    "us.meta.llama4-maverick-17b-instruct-v1:0": "us.meta.llama4-maverick-17b-instruct-v1:0",
+    "llama4-scout": "us.meta.llama4-scout-17b-instruct-v1:0",
+    "llama-4-scout": "us.meta.llama4-scout-17b-instruct-v1:0",
+    "meta.llama4-scout-17b-instruct-v1:0": "meta.llama4-scout-17b-instruct-v1:0",
+    "us.meta.llama4-scout-17b-instruct-v1:0": "us.meta.llama4-scout-17b-instruct-v1:0",
+    # OpenAI GPT-OSS (Bedrock-hosted open weights).
+    "gpt-oss": "openai.gpt-oss-120b-1:0",
+    "gpt-oss-120b": "openai.gpt-oss-120b-1:0",
+    "openai.gpt-oss-120b-1:0": "openai.gpt-oss-120b-1:0",
+    "gpt-oss-20b": "openai.gpt-oss-20b-1:0",
+    "openai.gpt-oss-20b-1:0": "openai.gpt-oss-20b-1:0",
 }
 
 
@@ -80,6 +101,8 @@ def _resolve_model(request_model: Any) -> tuple[str, str]:
         name.startswith("arn:aws:bedrock:")
         or name.startswith("anthropic.")
         or name.startswith("amazon.")
+        or name.startswith("meta.")
+        or name.startswith("openai.")
         or name.startswith("us.")
         or name.startswith("eu.")
         or name.startswith("au.")
