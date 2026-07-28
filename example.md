@@ -17,18 +17,6 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   }' | jq '{model, answer: .choices[0].message.content, usage}'
 echo
 
-# Claude Sonnet (marketplace)
-curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
-  -d '{
-    "model": "claude-sonnet-5",
-    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
-    "max_tokens": 64,
-    "temperature": 0
-  }' | jq '{model, answer: .choices[0].message.content, usage}'
-echo
-
 # Amazon Nova Pro (marketplace)
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
@@ -40,3 +28,17 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "temperature": 0
   }' | jq '{model, answer: .choices[0].message.content, usage}'
 echo
+
+# Claude Sonnet (marketplace) not work now
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-sonnet-5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+echo
+
+
