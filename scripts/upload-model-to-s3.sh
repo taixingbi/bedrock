@@ -3,9 +3,12 @@
 #
 # Usage:
 #   ./scripts/upload-model-to-s3.sh claude-sonnet
+#   ./scripts/upload-model-to-s3.sh claude-opus
 #   ./scripts/upload-model-to-s3.sh nova-pro
 #   ./scripts/upload-model-to-s3.sh llama
 #   ./scripts/upload-model-to-s3.sh gpt-oss
+#   ./scripts/upload-model-to-s3.sh gpt-5.5
+#   ./scripts/upload-model-to-s3.sh deepseek
 #   ./scripts/upload-model-to-s3.sh qwen
 #   ./scripts/upload-model-to-s3.sh qwen --local ./Qwen2.5-7B-Instruct
 #
@@ -24,9 +27,12 @@ Usage: ./scripts/upload-model-to-s3.sh <model> [options]
 
 Models:
   claude-sonnet   Register marketplace manifest (no HF weights)
+  claude-opus     Register Claude Opus 4.5 marketplace manifest
   nova-pro        Register marketplace manifest (no HF weights)
   llama           Register Meta Llama 3.3 70B marketplace manifest
   gpt-oss         Register OpenAI GPT-OSS 120B marketplace manifest
+  gpt-5.5         Register OpenAI GPT-5.5 marketplace manifest (mantle)
+  deepseek        Register DeepSeek V3.2 marketplace manifest
   qwen            Download Qwen2.5-7B-Instruct (unless --local) and s3 sync
 
 Options (qwen):
@@ -130,6 +136,19 @@ upload_claude_sonnet() {
     "${GLOBAL_PROFILE:-global.${model_id}}"
 }
 
+upload_claude_opus() {
+  local model_name="${MODEL_NAME:-claude-opus-4-5}"
+  local model_id="${MODEL_ID:-anthropic.claude-opus-4-5-20251101-v1:0}"
+  upload_marketplace_manifest \
+    "Claude Opus 4.5" \
+    "anthropic" \
+    "${model_name}" \
+    "${model_id}" \
+    "claude-opus, claude-opus-4.5, claude-opus-4-5, us.anthropic.claude-opus-4-5-20251101-v1:0" \
+    "${US_PROFILE:-us.${model_id}}" \
+    "${GLOBAL_PROFILE:-global.${model_id}}"
+}
+
 upload_nova_pro() {
   local model_name="${MODEL_NAME:-nova-pro-v1}"
   local model_id="${MODEL_ID:-amazon.nova-pro-v1:0}"
@@ -165,6 +184,32 @@ upload_gpt_oss() {
     "${model_name}" \
     "${model_id}" \
     "gpt-oss, gpt-oss-120b, openai.gpt-oss-120b-1:0" \
+    "" \
+    ""
+}
+
+upload_gpt_55() {
+  local model_name="${MODEL_NAME:-gpt-5.5}"
+  local model_id="${MODEL_ID:-openai.gpt-5.5}"
+  upload_marketplace_manifest \
+    "OpenAI GPT-5.5" \
+    "openai" \
+    "${model_name}" \
+    "${model_id}" \
+    "gpt-5.5, gpt-5-5, openai.gpt-5.5" \
+    "" \
+    ""
+}
+
+upload_deepseek() {
+  local model_name="${MODEL_NAME:-deepseek-v3.2}"
+  local model_id="${MODEL_ID:-deepseek.v3.2}"
+  upload_marketplace_manifest \
+    "DeepSeek V3.2" \
+    "deepseek" \
+    "${model_name}" \
+    "${model_id}" \
+    "deepseek, deepseek-v3.2, deepseek.v3.2" \
     "" \
     ""
 }
@@ -220,6 +265,9 @@ case "${MODEL}" in
   claude-sonnet|claude-sonnet-5)
     upload_claude_sonnet
     ;;
+  claude-opus|claude-opus-4.5|claude-opus-4-5)
+    upload_claude_opus
+    ;;
   nova-pro|nova-pro-v1|amazon.nova-pro-v1:0)
     upload_nova_pro
     ;;
@@ -229,10 +277,16 @@ case "${MODEL}" in
   gpt-oss|gpt-oss-120b|openai.gpt-oss-120b-1:0)
     upload_gpt_oss
     ;;
+  gpt-5.5|gpt-5-5|openai.gpt-5.5)
+    upload_gpt_55
+    ;;
+  deepseek|deepseek-v3.2|deepseek.v3.2)
+    upload_deepseek
+    ;;
   qwen|Qwen2.5-7B-Instruct|qwen2.5-7b-instruct)
     upload_qwen "$@"
     ;;
   *)
-    die "unknown model '${MODEL}' (try: claude-sonnet, nova-pro, llama, gpt-oss, qwen)"
+    die "unknown model '${MODEL}' (try: claude-sonnet, claude-opus, nova-pro, llama, gpt-oss, gpt-5.5, deepseek, qwen)"
     ;;
 esac

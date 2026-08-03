@@ -33,6 +33,7 @@ The request `model` field selects which Bedrock backend to call. Built-in aliase
 | --- | --- | --- |
 | `claude-sonnet` / `claude-sonnet-5` / `anthropic.claude-sonnet-5` | `anthropic.claude-sonnet-5` | Converse |
 | `us.anthropic.claude-sonnet-5` | US geo inference profile | Converse |
+| `claude-opus` / `claude-opus-4.5` | `us.anthropic.claude-opus-4-5-20251101-v1:0` | Converse |
 | `nova-pro` / `amazon.nova-pro-v1:0` | `amazon.nova-pro-v1:0` | Converse |
 | `us.amazon.nova-pro-v1:0` | US geo inference profile | Converse |
 | `nova-lite` / `amazon.nova-lite-v1:0` | `amazon.nova-lite-v1:0` | Converse |
@@ -41,6 +42,9 @@ The request `model` field selects which Bedrock backend to call. Built-in aliase
 | `llama4-scout` | `us.meta.llama4-scout-17b-instruct-v1:0` | Converse |
 | `gpt-oss` / `gpt-oss-120b` | `openai.gpt-oss-120b-1:0` | Converse |
 | `gpt-oss-20b` | `openai.gpt-oss-20b-1:0` | Converse |
+| `gpt-5.5` / `openai.gpt-5.5` | `openai.gpt-5.5` | Mantle Responses |
+| `deepseek` / `deepseek.v3.2` | `deepseek.v3.2` | Converse |
+| `deepseek-r1` | `us.deepseek.r1-v1:0` | Converse |
 | `Qwen/Qwen2.5-7B-Instruct` / `qwen` | deployed `MODEL_ID` when it is an imported-model ARN | InvokeModel |
 
 Raw Bedrock IDs and imported-model ARNs are also accepted. Unknown names return `400`.
@@ -98,6 +102,25 @@ Optional catalog manifest in the shared bucket:
 
 Submit the Anthropic use-case form in the Bedrock console before first invoke.
 
+### Claude Opus 4.5 (marketplace)
+
+Enable model access, then call (friendly aliases default to the **US geo** inference profile):
+
+```json
+{"model": "claude-opus-4.5", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+```bash
+./scripts/upload-model-to-s3.sh claude-opus
+# → s3://bedrock-models-646821141010/anthropic/claude-opus-4-5/model-manifest.json
+```
+
+| Mode | Bedrock ID |
+| --- | --- |
+| In-region | `anthropic.claude-opus-4-5-20251101-v1:0` |
+| US geo cross-region (default alias) | `us.anthropic.claude-opus-4-5-20251101-v1:0` |
+| Global | `global.anthropic.claude-opus-4-5-20251101-v1:0` |
+
 ### Meta Llama (marketplace)
 
 Enable Meta model access in the Bedrock console. Friendly aliases default to the **US geo inference profile** (required for on-demand on many Llama IDs):
@@ -135,6 +158,39 @@ Bedrock-hosted OpenAI open-weight models (not ChatGPT API keys). Enable access, 
 # → s3://bedrock-models-646821141010/openai/gpt-oss-120b/model-manifest.json
 ```
 
+### OpenAI GPT-5.5 (marketplace)
+
+GPT-5.5 on Bedrock is **Responses-API only** via `bedrock-mantle` (not Converse). The Lambda signs Mantle requests with SigV4. Enable access in `us-east-1` or `us-east-2`, then:
+
+```json
+{"model": "gpt-5.5", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+Omit `temperature` / `top_p` — GPT-5.x rejects them. Optional env: `BEDROCK_MANTLE_REGION`, `BEDROCK_MANTLE_REASONING_EFFORT` (default `minimal`).
+
+```bash
+./scripts/upload-model-to-s3.sh gpt-5.5
+# → s3://bedrock-models-646821141010/openai/gpt-5.5/model-manifest.json
+```
+
+### DeepSeek (marketplace)
+
+Enable DeepSeek access, then:
+
+```json
+{"model": "deepseek", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+| Alias | Bedrock ID |
+| --- | --- |
+| `deepseek` / `deepseek-v3.2` | `deepseek.v3.2` |
+| `deepseek-r1` | `us.deepseek.r1-v1:0` |
+
+```bash
+./scripts/upload-model-to-s3.sh deepseek
+# → s3://bedrock-models-646821141010/deepseek/deepseek-v3.2/model-manifest.json
+```
+
 ### Custom import (e.g. Qwen2.5)
 
 Qwen2.5 is not a built-in Bedrock marketplace ID. Download Hugging Face weights, upload to S3, then [Custom Model Import](https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html). Set `MODEL_ID` to the **imported model ARN** (also used for the `Qwen/Qwen2.5-7B-Instruct` alias).
@@ -145,12 +201,15 @@ Shared models bucket (`us-east-1`):
 s3://bedrock-models-646821141010/
   qwen/Qwen2.5-7B-Instruct/   ← config.json must live here
   anthropic/claude-sonnet-5/  ← marketplace manifest (no HF weights)
+  anthropic/claude-opus-4-5/  ← marketplace manifest (no HF weights)
   amazon/nova-pro-v1/         ← marketplace manifest (no HF weights)
   meta/llama3-3-70b-instruct/ ← marketplace manifest (no HF weights)
   openai/gpt-oss-120b/        ← marketplace manifest (no HF weights)
+  openai/gpt-5.5/             ← marketplace manifest (mantle Responses)
+  deepseek/deepseek-v3.2/     ← marketplace manifest (no HF weights)
 ```
 
-Marketplace Claude/Nova/Meta/OpenAI models are enabled in the Bedrock console — they are not stored as HF weights in this bucket.
+Marketplace Claude/Nova/Meta/OpenAI/DeepSeek models are enabled in the Bedrock console — they are not stored as HF weights in this bucket.
 
 #### 1. Download and upload Qwen2.5-7B-Instruct
 
@@ -366,6 +425,47 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+Claude Opus 4.5 (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-opus-4.5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+DeepSeek V3.2 (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "deepseek",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+OpenAI GPT-5.5 (marketplace, Mantle):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "gpt-5.5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64
   }' | jq '{model, answer: .choices[0].message.content, usage}'
 ```
 
