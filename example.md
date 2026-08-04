@@ -89,14 +89,3 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "temperature": 0
   }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
-
-# OpenAI GPT-5.5 (marketplace) — bedrock-mantle Responses API
-curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
-  -d '{
-    "model": "gpt-5.5",
-    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
-    "max_tokens": 64
-  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
-echo
