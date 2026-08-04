@@ -22,7 +22,7 @@ MODEL_ID = DEFAULT_MODEL_ID
 API_KEY = os.environ.get("API_KEY", "")
 MANTLE_SIGNING_NAME = os.environ.get("BEDROCK_MANTLE_SIGNING_NAME", "bedrock-mantle")
 MANTLE_REGION = os.environ.get("BEDROCK_MANTLE_REGION", "").strip()
-MANTLE_REASONING_EFFORT = os.environ.get("BEDROCK_MANTLE_REASONING_EFFORT", "minimal")
+MANTLE_REASONING_EFFORT = os.environ.get("BEDROCK_MANTLE_REASONING_EFFORT", "none")
 
 # Friendly request names → Bedrock model ID / imported-model ARN.
 _BUILTIN_MODEL_ALIASES: dict[str, str] = {

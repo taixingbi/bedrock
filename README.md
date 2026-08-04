@@ -166,7 +166,7 @@ GPT-5.5 on Bedrock is **Responses-API only** via `bedrock-mantle` (not Converse)
 {"model": "gpt-5.5", "messages": [{"role": "user", "content": "Hello"}]}
 ```
 
-Omit `temperature` / `top_p` — GPT-5.x rejects them. Optional env: `BEDROCK_MANTLE_REGION`, `BEDROCK_MANTLE_REASONING_EFFORT` (default `minimal`).
+Omit `temperature` / `top_p` — GPT-5.x rejects them. Optional env: `BEDROCK_MANTLE_REGION`, `BEDROCK_MANTLE_REASONING_EFFORT` (default `none`; also `low` / `medium` / `high` / `xhigh`).
 
 ```bash
 ./scripts/upload-model-to-s3.sh gpt-5.5
