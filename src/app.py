@@ -75,6 +75,10 @@ _BUILTIN_MODEL_ALIASES: dict[str, str] = {
     "deepseek-r1": "us.deepseek.r1-v1:0",
     "deepseek.r1-v1:0": "deepseek.r1-v1:0",
     "us.deepseek.r1-v1:0": "us.deepseek.r1-v1:0",
+    # Qwen3 Next 80B A3B (marketplace).
+    "qwen3-next-80b-a3b": "qwen.qwen3-next-80b-a3b",
+    "qwen.qwen3-next-80b-a3b": "qwen.qwen3-next-80b-a3b",
+    "Qwen/Qwen3-Next-80B-A3B-Instruct": "qwen.qwen3-next-80b-a3b",
 }
 
 
@@ -139,6 +143,7 @@ def _resolve_model(request_model: Any) -> tuple[str, str]:
         or name.startswith("meta.")
         or name.startswith("openai.")
         or name.startswith("deepseek.")
+        or name.startswith("qwen.")
         or name.startswith("us.")
         or name.startswith("eu.")
         or name.startswith("au.")

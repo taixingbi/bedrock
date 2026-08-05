@@ -9,6 +9,7 @@
 #   ./scripts/upload-model-to-s3.sh gpt-oss
 #   ./scripts/upload-model-to-s3.sh gpt-5.5
 #   ./scripts/upload-model-to-s3.sh deepseek
+#   ./scripts/upload-model-to-s3.sh qwen3-next-80b-a3b
 #   ./scripts/upload-model-to-s3.sh qwen
 #   ./scripts/upload-model-to-s3.sh qwen --local ./Qwen2.5-7B-Instruct
 #
@@ -33,6 +34,7 @@ Models:
   gpt-oss         Register OpenAI GPT-OSS 120B marketplace manifest
   gpt-5.5         Register OpenAI GPT-5.5 marketplace manifest (mantle)
   deepseek        Register DeepSeek V3.2 marketplace manifest
+  qwen3-next-80b-a3b  Register Qwen3 Next 80B A3B marketplace manifest
   qwen            Download Qwen2.5-7B-Instruct (unless --local) and s3 sync
 
 Options (qwen):
@@ -214,6 +216,19 @@ upload_deepseek() {
     ""
 }
 
+upload_qwen3_next() {
+  local model_name="${MODEL_NAME:-qwen3-next-80b-a3b}"
+  local model_id="${MODEL_ID:-qwen.qwen3-next-80b-a3b}"
+  upload_marketplace_manifest \
+    "Qwen3 Next 80B A3B" \
+    "qwen" \
+    "${model_name}" \
+    "${model_id}" \
+    "qwen3-next-80b-a3b, qwen.qwen3-next-80b-a3b" \
+    "" \
+    ""
+}
+
 upload_qwen() {
   require_aws
 
@@ -283,10 +298,13 @@ case "${MODEL}" in
   deepseek|deepseek-v3.2|deepseek.v3.2)
     upload_deepseek
     ;;
+  qwen3-next-80b-a3b|qwen.qwen3-next-80b-a3b)
+    upload_qwen3_next
+    ;;
   qwen|Qwen2.5-7B-Instruct|qwen2.5-7b-instruct)
     upload_qwen "$@"
     ;;
   *)
-    die "unknown model '${MODEL}' (try: claude-sonnet, claude-opus, nova-pro, llama, gpt-oss, gpt-5.5, deepseek, qwen)"
+    die "unknown model '${MODEL}' (try: claude-sonnet, claude-opus, nova-pro, llama, gpt-oss, gpt-5.5, deepseek, qwen3-next-80b-a3b, qwen)"
     ;;
 esac

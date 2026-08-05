@@ -18,6 +18,18 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
 
+# Qwen3 Next 80B A3B (marketplace)
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "qwen3-next-80b-a3b",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+echo
+
 # Amazon Nova Pro (marketplace)
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
@@ -89,3 +101,5 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "temperature": 0
   }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
+
+

@@ -45,6 +45,7 @@ The request `model` field selects which Bedrock backend to call. Built-in aliase
 | `gpt-5.5` / `openai.gpt-5.5` | `openai.gpt-5.5` | Mantle Responses |
 | `deepseek` / `deepseek.v3.2` | `deepseek.v3.2` | Converse |
 | `deepseek-r1` | `us.deepseek.r1-v1:0` | Converse |
+| `qwen3-next-80b-a3b` / `qwen.qwen3-next-80b-a3b` | `qwen.qwen3-next-80b-a3b` | Converse |
 | `Qwen/Qwen2.5-7B-Instruct` / `qwen` | deployed `MODEL_ID` when it is an imported-model ARN | InvokeModel |
 
 Raw Bedrock IDs and imported-model ARNs are also accepted. Unknown names return `400`.
@@ -191,6 +192,26 @@ Enable DeepSeek access, then:
 # → s3://bedrock-models-646821141010/deepseek/deepseek-v3.2/model-manifest.json
 ```
 
+### Qwen3 Next 80B A3B (marketplace)
+
+Fully managed open-weight model on Bedrock (Converse). Enable access, then:
+
+```json
+{"model": "qwen3-next-80b-a3b", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+| Alias | Bedrock ID |
+| --- | --- |
+| `qwen3-next-80b-a3b` | `qwen.qwen3-next-80b-a3b` |
+| `Qwen/Qwen3-Next-80B-A3B-Instruct` | `qwen.qwen3-next-80b-a3b` |
+
+No geo inference profiles (in-region only). Distinct from the custom-imported `Qwen/Qwen2.5-7B-Instruct` alias.
+
+```bash
+./scripts/upload-model-to-s3.sh qwen3-next-80b-a3b
+# → s3://bedrock-models-646821141010/qwen/qwen3-next-80b-a3b/model-manifest.json
+```
+
 ### Custom import (e.g. Qwen2.5)
 
 Qwen2.5 is not a built-in Bedrock marketplace ID. Download Hugging Face weights, upload to S3, then [Custom Model Import](https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html). Set `MODEL_ID` to the **imported model ARN** (also used for the `Qwen/Qwen2.5-7B-Instruct` alias).
@@ -207,9 +228,10 @@ s3://bedrock-models-646821141010/
   openai/gpt-oss-120b/        ← marketplace manifest (no HF weights)
   openai/gpt-5.5/             ← marketplace manifest (mantle Responses)
   deepseek/deepseek-v3.2/     ← marketplace manifest (no HF weights)
+  qwen/qwen3-next-80b-a3b/    ← marketplace manifest (no HF weights)
 ```
 
-Marketplace Claude/Nova/Meta/OpenAI/DeepSeek models are enabled in the Bedrock console — they are not stored as HF weights in this bucket.
+Marketplace Claude/Nova/Meta/OpenAI/DeepSeek/Qwen3-Next models are enabled in the Bedrock console — they are not stored as HF weights in this bucket.
 
 #### 1. Download and upload Qwen2.5-7B-Instruct
 
@@ -450,6 +472,20 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
   -d '{
     "model": "deepseek",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+Qwen3 Next 80B A3B (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "qwen3-next-80b-a3b",
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0
