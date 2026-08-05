@@ -31,6 +31,11 @@ _BUILTIN_MODEL_ALIASES: dict[str, str] = {
     "anthropic.claude-sonnet-5": "anthropic.claude-sonnet-5",
     "us.anthropic.claude-sonnet-5": "us.anthropic.claude-sonnet-5",
     "global.anthropic.claude-sonnet-5": "global.anthropic.claude-sonnet-5",
+    # Claude Sonnet 4 — default to US geo (on-demand typically needs inference profile).
+    "claude-sonnet-4": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+    "anthropic.claude-sonnet-4-20250514-v1:0": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "us.anthropic.claude-sonnet-4-20250514-v1:0": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+    "global.anthropic.claude-sonnet-4-20250514-v1:0": "global.anthropic.claude-sonnet-4-20250514-v1:0",
     # Claude Opus 4.5 — default to US geo (in-region runtime often N/A).
     "claude-opus": "us.anthropic.claude-opus-4-5-20251101-v1:0",
     "claude-opus-4.5": "us.anthropic.claude-opus-4-5-20251101-v1:0",

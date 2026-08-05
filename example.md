@@ -78,6 +78,18 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
 
+# Claude Sonnet 4 (marketplace) — needs Anthropic use-case form
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+echo
+
 # Claude Opus 4.5 (marketplace) — needs Anthropic use-case form
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \

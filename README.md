@@ -33,6 +33,7 @@ The request `model` field selects which Bedrock backend to call. Built-in aliase
 | --- | --- | --- |
 | `claude-sonnet` / `claude-sonnet-5` / `anthropic.claude-sonnet-5` | `anthropic.claude-sonnet-5` | Converse |
 | `us.anthropic.claude-sonnet-5` | US geo inference profile | Converse |
+| `claude-sonnet-4` | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Converse |
 | `claude-opus` / `claude-opus-4.5` | `us.anthropic.claude-opus-4-5-20251101-v1:0` | Converse |
 | `nova-pro` / `amazon.nova-pro-v1:0` | `amazon.nova-pro-v1:0` | Converse |
 | `us.amazon.nova-pro-v1:0` | US geo inference profile | Converse |
@@ -102,6 +103,25 @@ Optional catalog manifest in the shared bucket:
 | Global | `global.anthropic.claude-sonnet-5` |
 
 Submit the Anthropic use-case form in the Bedrock console before first invoke.
+
+### Claude Sonnet 4 (marketplace)
+
+Enable model access, then call (friendly alias defaults to the **US geo** inference profile):
+
+```json
+{"model": "claude-sonnet-4", "messages": [{"role": "user", "content": "Hello"}]}
+```
+
+```bash
+./scripts/upload-model-to-s3.sh claude-sonnet-4
+# → s3://bedrock-models-646821141010/anthropic/claude-sonnet-4/model-manifest.json
+```
+
+| Mode | Bedrock ID |
+| --- | --- |
+| In-region | `anthropic.claude-sonnet-4-20250514-v1:0` |
+| US geo cross-region (default alias) | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
+| Global | `global.anthropic.claude-sonnet-4-20250514-v1:0` |
 
 ### Claude Opus 4.5 (marketplace)
 
@@ -222,6 +242,7 @@ Shared models bucket (`us-east-1`):
 s3://bedrock-models-646821141010/
   qwen/Qwen2.5-7B-Instruct/   ← config.json must live here
   anthropic/claude-sonnet-5/  ← marketplace manifest (no HF weights)
+  anthropic/claude-sonnet-4/  ← marketplace manifest (no HF weights)
   anthropic/claude-opus-4-5/  ← marketplace manifest (no HF weights)
   amazon/nova-pro-v1/         ← marketplace manifest (no HF weights)
   meta/llama3-3-70b-instruct/ ← marketplace manifest (no HF weights)
@@ -402,6 +423,20 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
   -d '{
     "model": "claude-sonnet-5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+Claude Sonnet 4 (marketplace):
+
+```bash
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-sonnet-4",
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0

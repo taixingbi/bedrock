@@ -3,6 +3,7 @@
 #
 # Usage:
 #   ./scripts/upload-model-to-s3.sh claude-sonnet
+#   ./scripts/upload-model-to-s3.sh claude-sonnet-4
 #   ./scripts/upload-model-to-s3.sh claude-opus
 #   ./scripts/upload-model-to-s3.sh nova-pro
 #   ./scripts/upload-model-to-s3.sh llama
@@ -28,6 +29,7 @@ Usage: ./scripts/upload-model-to-s3.sh <model> [options]
 
 Models:
   claude-sonnet   Register marketplace manifest (no HF weights)
+  claude-sonnet-4 Register Claude Sonnet 4 marketplace manifest
   claude-opus     Register Claude Opus 4.5 marketplace manifest
   nova-pro        Register marketplace manifest (no HF weights)
   llama           Register Meta Llama 3.3 70B marketplace manifest
@@ -134,6 +136,19 @@ upload_claude_sonnet() {
     "${model_name}" \
     "${model_id}" \
     "claude-sonnet, claude-sonnet-5, anthropic.claude-sonnet-5" \
+    "${US_PROFILE:-us.${model_id}}" \
+    "${GLOBAL_PROFILE:-global.${model_id}}"
+}
+
+upload_claude_sonnet_4() {
+  local model_name="${MODEL_NAME:-claude-sonnet-4}"
+  local model_id="${MODEL_ID:-anthropic.claude-sonnet-4-20250514-v1:0}"
+  upload_marketplace_manifest \
+    "Claude Sonnet 4" \
+    "anthropic" \
+    "${model_name}" \
+    "${model_id}" \
+    "claude-sonnet-4, us.anthropic.claude-sonnet-4-20250514-v1:0" \
     "${US_PROFILE:-us.${model_id}}" \
     "${GLOBAL_PROFILE:-global.${model_id}}"
 }
@@ -280,6 +295,9 @@ case "${MODEL}" in
   claude-sonnet|claude-sonnet-5)
     upload_claude_sonnet
     ;;
+  claude-sonnet-4|anthropic.claude-sonnet-4-20250514-v1:0)
+    upload_claude_sonnet_4
+    ;;
   claude-opus|claude-opus-4.5|claude-opus-4-5)
     upload_claude_opus
     ;;
@@ -305,6 +323,6 @@ case "${MODEL}" in
     upload_qwen "$@"
     ;;
   *)
-    die "unknown model '${MODEL}' (try: claude-sonnet, claude-opus, nova-pro, llama, gpt-oss, gpt-5.5, deepseek, qwen3-next-80b-a3b, qwen)"
+    die "unknown model '${MODEL}' (try: claude-sonnet, claude-sonnet-4, claude-opus, nova-pro, llama, gpt-oss, gpt-5.5, deepseek, qwen3-next-80b-a3b, qwen)"
     ;;
 esac
