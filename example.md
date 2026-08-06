@@ -66,16 +66,27 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
 
-# Claude Sonnet (marketplace) — needs Anthropic use-case form
+# OpenAI GPT-5.5 (marketplace, Mantle) — omit temperature / top_p
 curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
   -d '{
-    "model": "claude-sonnet-5",
+    "model": "gpt-5.5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+echo
+
+# OpenAI GPT-5.5 (stream — Mantle Responses SSE → chat chunks)
+curl -sS -N -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "gpt-5.5",
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
-    "temperature": 0
-  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+    "stream": true
+  }'
 echo
 
 # Claude Sonnet 4 (marketplace) — needs Anthropic use-case form
@@ -84,6 +95,31 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
   -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
   -d '{
     "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0
+  }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
+echo
+
+# Claude Sonnet 4 (stream)
+curl -sS -N -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-sonnet-4",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "temperature": 0,
+    "stream": true
+  }'
+echo
+
+# Claude Sonnet 5 (marketplace) — needs Anthropic use-case form
+curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "claude-sonnet-5",
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64,
     "temperature": 0
@@ -113,5 +149,3 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "temperature": 0
   }' | jq '{error, detail, model, answer: .choices[0].message.content, usage}'
 echo
-
-

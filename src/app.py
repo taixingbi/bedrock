@@ -9,9 +9,9 @@ import boto3
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.exceptions import ClientError
-from botocore.httpsession import URLLib3Session
 from fastapi import FastAPI, Header, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
+import urllib3
 
 bedrock = boto3.client("bedrock-runtime")
 _session = boto3.Session()
@@ -321,12 +321,13 @@ def _extract_responses_text(body: dict[str, Any]) -> str:
     return fallback if isinstance(fallback, str) else ""
 
 
-def _infer_mantle_responses(
+def _mantle_responses_body(
     messages: list[dict[str, str]],
     max_tokens: int,
     bedrock_model_id: str,
+    *,
+    stream: bool,
 ) -> dict[str, Any]:
-    """Call OpenAI GPT-5.x via bedrock-mantle /openai/v1/responses (SigV4)."""
     system, rest = _split_system(messages)
     body: dict[str, Any] = {
         "model": bedrock_model_id,
@@ -334,10 +335,15 @@ def _infer_mantle_responses(
         "max_output_tokens": max_tokens,
         "reasoning": {"effort": MANTLE_REASONING_EFFORT},
         "store": False,
+        "stream": stream,
     }
     if system:
         body["instructions"] = system
+    return body
 
+
+def _mantle_signed_request(body: dict[str, Any]) -> tuple[str, dict[str, str], bytes]:
+    """Return (url, headers, body_bytes) for a SigV4-signed mantle POST."""
     region = _mantle_region()
     credentials = _session.get_credentials()
     if credentials is None:
@@ -353,12 +359,33 @@ def _infer_mantle_responses(
         headers={"Content-Type": "application/json"},
     )
     SigV4Auth(frozen, MANTLE_SIGNING_NAME, region).add_auth(aws_request)
-    http = URLLib3Session(timeout=(10, 290))
-    response = http.send(aws_request.prepare())
-    response_body = json.loads(response.text)
-    if response.status_code >= 400:
+    prepared = aws_request.prepare()
+    headers = {k: v for k, v in prepared.headers.items() if v is not None}
+    return url, headers, data
+
+
+def _infer_mantle_responses(
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    bedrock_model_id: str,
+) -> dict[str, Any]:
+    """Call OpenAI GPT-5.x via bedrock-mantle /openai/v1/responses (SigV4)."""
+    body = _mantle_responses_body(
+        messages, max_tokens, bedrock_model_id, stream=False
+    )
+    url, headers, data = _mantle_signed_request(body)
+    http = urllib3.PoolManager()
+    response = http.request(
+        "POST",
+        url,
+        body=data,
+        headers=headers,
+        timeout=urllib3.Timeout(connect=10, read=290),
+    )
+    response_body = json.loads(response.data.decode("utf-8"))
+    if response.status >= 400:
         detail = response_body.get("error") or response_body
-        raise RuntimeError(f"bedrock-mantle HTTP {response.status_code}: {detail}")
+        raise RuntimeError(f"bedrock-mantle HTTP {response.status}: {detail}")
 
     usage = response_body.get("usage") or {}
     return {
@@ -713,15 +740,58 @@ def _run_inference(
     )
 
 
+def _iter_sse_json(byte_chunks: Iterator[bytes]) -> Iterator[dict[str, Any]]:
+    """Parse SSE `data: {json}` events from a byte stream."""
+    buffer = ""
+    for chunk in byte_chunks:
+        buffer += chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+        while "\n" in buffer:
+            line, buffer = buffer.split("\n", 1)
+            line = line.rstrip("\r")
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].lstrip()
+            if not data or data == "[DONE]":
+                return
+            try:
+                event = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(event, dict):
+                yield event
+
+
 def _stream_mantle_as_chunks(
     messages: list[dict[str, str]],
     max_tokens: int,
     model: str,
     bedrock_model_id: str,
 ) -> Iterator[str]:
-    """Mantle streaming is Responses SSE; buffer via non-stream for OpenAI chat shape."""
-    inferred = _infer_mantle_responses(messages, max_tokens, bedrock_model_id)
-    completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+    """Stream Mantle Responses SSE and re-emit OpenAI chat.completion.chunk SSE."""
+    body = _mantle_responses_body(
+        messages, max_tokens, bedrock_model_id, stream=True
+    )
+    url, headers, data = _mantle_signed_request(body)
+    http = urllib3.PoolManager()
+    # Open before first yield so setup failures become HTTP 502.
+    response = http.request(
+        "POST",
+        url,
+        body=data,
+        headers=headers,
+        preload_content=False,
+        timeout=urllib3.Timeout(connect=10, read=290),
+    )
+    if response.status >= 400:
+        try:
+            error_body = json.loads(response.data.decode("utf-8"))
+            detail = error_body.get("error") or error_body
+        except Exception:  # noqa: BLE001
+            detail = response.data.decode("utf-8", errors="replace")[:500]
+        response.release_conn()
+        raise RuntimeError(f"bedrock-mantle HTTP {response.status}: {detail}")
+
+    completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
     yield _sse(
         json.dumps(
@@ -729,11 +799,44 @@ def _stream_mantle_as_chunks(
                 completion_id=completion_id,
                 created=created,
                 model=model,
-                delta={"role": "assistant", "content": inferred["text"]},
-                finish_reason=None,
+                delta={"role": "assistant", "content": ""},
             )
         )
     )
+
+    finish_reason = "stop"
+    try:
+        for event in _iter_sse_json(response.stream(amt=1024, decode_content=True)):
+            event_type = event.get("type")
+            if event_type == "response.output_text.delta":
+                text = event.get("delta")
+                if isinstance(text, str) and text:
+                    yield _sse(
+                        json.dumps(
+                            _openai_chunk(
+                                completion_id=completion_id,
+                                created=created,
+                                model=model,
+                                delta={"content": text},
+                            )
+                        )
+                    )
+            elif event_type == "error":
+                message = event.get("message") or event.get("error") or "mantle stream error"
+                if isinstance(message, dict):
+                    message = message.get("message") or str(message)
+                raise RuntimeError(str(message))
+            elif event_type == "response.completed":
+                completed = event.get("response") or {}
+                status = completed.get("status")
+                incomplete = completed.get("incomplete_details") or {}
+                reason = incomplete.get("reason") if isinstance(incomplete, dict) else None
+                if status == "incomplete" or reason == "max_output_tokens":
+                    finish_reason = "length"
+            # Skip reasoning / other lifecycle events — chat content only.
+    finally:
+        response.release_conn()
+
     yield _sse(
         json.dumps(
             _openai_chunk(
@@ -741,7 +844,7 @@ def _stream_mantle_as_chunks(
                 created=created,
                 model=model,
                 delta={},
-                finish_reason="stop",
+                finish_reason=finish_reason,
             )
         )
     )

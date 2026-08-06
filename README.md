@@ -187,6 +187,8 @@ GPT-5.5 on Bedrock is **Responses-API only** via `bedrock-mantle` (not Converse)
 {"model": "gpt-5.5", "messages": [{"role": "user", "content": "Hello"}]}
 ```
 
+`"stream": true` opens Mantle Responses SSE and translates `response.output_text.delta` events into OpenAI `chat.completion.chunk` SSE (reasoning deltas are skipped).
+
 Omit `temperature` / `top_p` — GPT-5.x rejects them. Optional env: `BEDROCK_MANTLE_REGION`, `BEDROCK_MANTLE_REASONING_EFFORT` (default `none`; also `low` / `medium` / `high` / `xhigh`).
 
 ```bash
@@ -361,7 +363,7 @@ Success (OpenAI chat.completion shape):
 
 The `model` field selects the Bedrock backend (see [Models](#models)); the same name is echoed in the response.
 
-Set `"stream": true` to receive OpenAI SSE (`text/event-stream`) chunks (`chat.completion.chunk` then `data: [DONE]`). Streaming uses Lambda Function URL `RESPONSE_STREAM` plus Bedrock `InvokeModelWithResponseStream` / `ConverseStream`.
+Set `"stream": true` to receive OpenAI SSE (`text/event-stream`) chunks (`chat.completion.chunk` then `data: [DONE]`). Streaming uses Lambda Function URL `RESPONSE_STREAM` plus Bedrock `InvokeModelWithResponseStream` / `ConverseStream` / Mantle Responses SSE (translated to chat chunks for GPT-5.x).
 
 ## Deploy
 
@@ -538,6 +540,20 @@ curl -sS -X POST "${FUNCTION_URL}v1/chat/completions" \
     "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
     "max_tokens": 64
   }' | jq '{model, answer: .choices[0].message.content, usage}'
+```
+
+OpenAI GPT-5.5 (stream — Mantle Responses SSE → chat chunks):
+
+```bash
+curl -sS -N -X POST "${FUNCTION_URL}v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${INFERENCE_API_KEY}" \
+  -d '{
+    "model": "gpt-5.5",
+    "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+    "max_tokens": 64,
+    "stream": true
+  }'
 ```
 
 ## Local invoke
